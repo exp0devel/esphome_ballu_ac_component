@@ -1,0 +1,1 @@
+Fork of https://github.com/GrKoR/esphome_aux_ac_component
