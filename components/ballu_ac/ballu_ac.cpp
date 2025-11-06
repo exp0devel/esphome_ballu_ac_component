@@ -28,8 +28,7 @@ climate::ClimateTraits BalluAC::traits() {
 }
 
 void BalluAC::loop() {
-  // poll every update_interval (set in YAML)
-  if (millis() - this->last_poll_ > this->update_interval_) {
+  if (millis() - this->last_poll_ > this->get_update_interval()) {
     this->last_poll_ = millis();
     uint8_t ping[] = {0x7E, 0x00};
     this->write_array(ping, sizeof(ping));
@@ -71,7 +70,6 @@ void BalluAC::parse_frame_(const std::vector<uint8_t> &data) {
     return;
   }
 
-  // ---- Extract data (Ballu layout) ----
   uint8_t temp_bcd = data[4];
   float temp = ((temp_bcd >> 4) & 0x0F) * 10 + (temp_bcd & 0x0F);
   this->current_temperature = temp;
@@ -96,8 +94,8 @@ void BalluAC::parse_frame_(const std::vector<uint8_t> &data) {
 }
 
 void BalluAC::control(const climate::ClimateCall &call) {
-  auto new_mode = this->mode;
-  auto new_fan_mode = this->fan_mode;
+  climate::ClimateMode new_mode = this->mode;
+  optional<climate::ClimateFanMode> new_fan_mode = this->fan_mode;
   float new_target = this->target_temperature;
   bool changed = false;
 
@@ -123,26 +121,34 @@ void BalluAC::control(const climate::ClimateCall &call) {
   uint8_t mode_bits = 0x00;
   switch (new_mode) {
     case climate::CLIMATE_MODE_COOL: mode_bits = 0x01; break;
-    case climate::CLIMATE_MODE_HEAT: mode_bits = 0x02; break;
-    case climate::CLIMATE_MODE_DRY: mode_bits = 0x03; break;
-    case climate::CLIMATE_MODE_FAN_ONLY: mode_bits = 0x04; break;
+    case 0x02: this->mode = climate::CLIMATE_MODE_HEAT; break;
+    case 0x03: this->mode = climate::CLIMATE_MODE_DRY; break;
+    case 0x04: this->mode = climate::CLIMATE_MODE_FAN_ONLY; break;
     default: break;
   }
 
   uint8_t fan_bits = 0x00;
-  switch (new_fan_mode) {
-    case climate::CLIMATE_FAN_LOW: fan_bits = 0x01; break;
-    case climate::CLIMATE_FAN_MEDIUM: fan_bits = 0x02; break;
-    case climate::CLIMATE_FAN_HIGH: fan_bits = 0x03; break;
-    default: fan_bits = 0x00; break;
+  if (new_fan_mode.has_value()) {
+    switch (*new_fan_mode) {
+      case climate::CLIMATE_FAN_LOW: fan_bits = 0x01; break;
+      case climate::CLIMATE_FAN_MEDIUM: fan_bits = 0x02; break;
+      case climate::CLIMATE_FAN_HIGH: fan_bits = 0x03; break;
+      default: fan_bits = 0x00; break;
+    }
   }
 
   bool power_on = new_mode != climate::CLIMATE_MODE_OFF;
-  uint8_t payload[5] = {0x00, power_on ? 0x01 : 0x00, temp_bcd, mode_bits, fan_bits};
+  uint8_t payload[5] = {
+    0x00,
+    static_cast<uint8_t>(power_on ? 0x01 : 0x00),
+    temp_bcd,
+    mode_bits,
+    fan_bits
+  };
   this->send_command_(0x01, payload, sizeof(payload));
 
   this->mode = new_mode;
-  this->fan_mode = new_fan_mode;
+  if (new_fan_mode.has_value()) this->fan_mode = *new_fan_mode;
   this->target_temperature = new_target;
   this->publish_state();
 }
