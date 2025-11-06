@@ -14,14 +14,12 @@ class BalluAC : public climate::Climate, public uart::UARTDevice, public Compone
   void control(const climate::ClimateCall &call) override;
   climate::ClimateTraits traits() override;
 
-  void set_ballu_mode(bool mode) { ballu_mode_ = mode; }
-
  protected:
   void parse_frame_(const std::vector<uint8_t> &data);
   void send_command_(uint8_t cmd, const uint8_t *payload, size_t len);
 
-  bool ballu_mode_{false};
   uint32_t last_poll_{0};
+  uint32_t period{7000};  // Default 7s poll
 };
 
 }  // namespace ballu_ac

@@ -28,7 +28,7 @@ climate::ClimateTraits BalluAC::traits() {
 }
 
 void BalluAC::loop() {
-  if (millis() - this->last_poll_ > this->get_update_interval()) {
+  if (millis() - this->last_poll_ > this->period) {
     this->last_poll_ = millis();
     uint8_t ping[] = {0x7E, 0x00};
     this->write_array(ping, sizeof(ping));
@@ -121,9 +121,9 @@ void BalluAC::control(const climate::ClimateCall &call) {
   uint8_t mode_bits = 0x00;
   switch (new_mode) {
     case climate::CLIMATE_MODE_COOL: mode_bits = 0x01; break;
-    case 0x02: this->mode = climate::CLIMATE_MODE_HEAT; break;
-    case 0x03: this->mode = climate::CLIMATE_MODE_DRY; break;
-    case 0x04: this->mode = climate::CLIMATE_MODE_FAN_ONLY; break;
+    case climate::CLIMATE_MODE_HEAT: mode_bits = 0x02; break;
+    case climate::CLIMATE_MODE_DRY: mode_bits = 0x03; break;
+    case climate::CLIMATE_MODE_FAN_ONLY: mode_bits = 0x04; break;
     default: break;
   }
 
@@ -138,13 +138,7 @@ void BalluAC::control(const climate::ClimateCall &call) {
   }
 
   bool power_on = new_mode != climate::CLIMATE_MODE_OFF;
-  uint8_t payload[5] = {
-    0x00,
-    static_cast<uint8_t>(power_on ? 0x01 : 0x00),
-    temp_bcd,
-    mode_bits,
-    fan_bits
-  };
+  uint8_t payload[5] = {0x00, static_cast<uint8_t>(power_on ? 0x01 : 0x00), temp_bcd, mode_bits, fan_bits};
   this->send_command_(0x01, payload, sizeof(payload));
 
   this->mode = new_mode;
