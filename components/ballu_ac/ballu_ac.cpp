@@ -28,7 +28,8 @@ climate::ClimateTraits BalluAC::traits() {
 }
 
 void BalluAC::loop() {
-  if (millis() - this->last_poll_ > this->period_) {
+  // poll every update_interval (set in YAML)
+  if (millis() - this->last_poll_ > this->update_interval_) {
     this->last_poll_ = millis();
     uint8_t ping[] = {0x7E, 0x00};
     this->write_array(ping, sizeof(ping));
@@ -70,6 +71,7 @@ void BalluAC::parse_frame_(const std::vector<uint8_t> &data) {
     return;
   }
 
+  // ---- Extract data (Ballu layout) ----
   uint8_t temp_bcd = data[4];
   float temp = ((temp_bcd >> 4) & 0x0F) * 10 + (temp_bcd & 0x0F);
   this->current_temperature = temp;
